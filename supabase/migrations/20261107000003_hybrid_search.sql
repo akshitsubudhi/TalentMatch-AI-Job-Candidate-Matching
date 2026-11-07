@@ -9,6 +9,14 @@
 -- Setting a weight to 0 skips that retriever entirely (the `p_*_weight > 0` predicate
 -- is a parameter-only qual, which Postgres turns into a one-time filter), which is how
 -- the benchmark measures keyword-only and vector-only modes with the same code path.
+--
+-- Two choices below came from profiling at 20k resumes / 34.5k chunks (see BENCHMARK.md):
+--  * plan_cache_mode = force_custom_plan: after 5 calls PL/pgSQL may switch to a generic
+--    plan that cannot see LIMIT/filter values and picks a full scan + sort instead of the
+--    HNSW index (measured: vector-only p50 154 ms generic vs 12.5 ms custom).
+--  * ts_rank instead of ts_rank_cd: cover density rewards query terms appearing close
+--    together, which is meaningless for an OR-list of skills, and it dominated keyword
+--    latency (p50 323 ms vs 80 ms).
 
 -- Build an OR-tsquery from the lexemes of a title + skills list.
 -- Lexemes come out of the 'english' parser already stemmed, so we feed them back
@@ -101,6 +109,7 @@ stable
 set search_path = public, extensions, pg_catalog
 set hnsw.iterative_scan = 'relaxed_order'
 set hnsw.ef_search = 100
+set plan_cache_mode = 'force_custom_plan'
 as $$
 #variable_conflict use_column
 declare
@@ -119,7 +128,7 @@ begin
 
   return query
   with keyword_hits as (
-    select c.id, ts_rank_cd(c.fts, v_query, 1) as score
+    select c.id, ts_rank(c.fts, v_query, 1) as score
       from public.candidates c
      where p_keyword_weight > 0
        and v_query is not null
@@ -201,6 +210,7 @@ stable
 set search_path = public, extensions, pg_catalog
 set hnsw.iterative_scan = 'relaxed_order'
 set hnsw.ef_search = 100
+set plan_cache_mode = 'force_custom_plan'
 as $$
 #variable_conflict use_column
 declare
@@ -218,7 +228,7 @@ begin
 
   return query
   with keyword_hits as (
-    select j.id, ts_rank_cd(j.fts, v_query, 1) as score
+    select j.id, ts_rank(j.fts, v_query, 1) as score
       from public.jobs j
      where p_keyword_weight > 0
        and v_query is not null
