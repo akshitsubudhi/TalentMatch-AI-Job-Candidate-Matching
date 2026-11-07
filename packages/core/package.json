@@ -5,11 +5,13 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
+    "./constants": "./src/constants.ts",
     "./embeddings": "./src/embeddings/index.ts",
     "./explain": "./src/explain/index.ts",
     "./ingest": "./src/ingest/index.ts",
     "./db": "./src/db/index.ts",
-    "./seed": "./src/seed/index.ts"
+    "./seed": "./src/seed/index.ts",
+    "./rrf": "./src/search/rrf.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

@@ -11,3 +11,4 @@ coverage/
 .vercel
 .turbo
 *.log
+apps/web/next-env.d.ts

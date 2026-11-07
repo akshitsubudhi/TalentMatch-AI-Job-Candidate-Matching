@@ -1,7 +1,8 @@
 import { z } from "zod";
+import { SENIORITIES } from "./constants";
 import { normalizeSkills } from "./skills";
 
-export const SENIORITIES = ["intern", "junior", "mid", "senior", "lead", "principal"] as const;
+export { SENIORITIES };
 export const SenioritySchema = z.enum(SENIORITIES);
 export type Seniority = z.infer<typeof SenioritySchema>;
 
