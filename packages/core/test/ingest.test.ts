@@ -1,34 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import { HashingEmbedder } from "../src/embeddings";
 import { AppError } from "../src/errors";
-import { IngestionService, type IngestionRepository, type NewCandidateRow, type NewChunkRow, type NewJobRow } from "../src/ingest";
+import { IngestionService, InMemoryIngestionRepository as MemoryRepo } from "../src/ingest";
 import { JobCreateInputSchema } from "../src/schemas";
-
-export class MemoryRepo implements IngestionRepository {
-  jobs = new Map<string, NewJobRow & { id: string }>();
-  candidates = new Map<string, NewCandidateRow & { id: string; chunks: NewChunkRow[] }>();
-  private seq = 0;
-  async findJobIdByHash(h: string) {
-    return [...this.jobs.values()].find((j) => j.contentHash === h)?.id ?? null;
-  }
-  async insertJob(row: NewJobRow) {
-    const existing = await this.findJobIdByHash(row.contentHash);
-    if (existing) return { id: existing, created: false };
-    const id = `job-${++this.seq}`;
-    this.jobs.set(id, { ...row, id });
-    return { id, created: true };
-  }
-  async findCandidateIdByHash(h: string) {
-    return [...this.candidates.values()].find((c) => c.contentHash === h)?.id ?? null;
-  }
-  async insertCandidateWithChunks(row: NewCandidateRow, chunks: NewChunkRow[]) {
-    const existing = await this.findCandidateIdByHash(row.contentHash);
-    if (existing) return { id: existing, created: false };
-    const id = `cand-${++this.seq}`;
-    this.candidates.set(id, { ...row, id, chunks });
-    return { id, created: true };
-  }
-}
 
 const textExtractor = async (bytes: Uint8Array) => new TextDecoder().decode(bytes);
 const fields = { fullName: "Test Person", location: "Remote", seniority: "mid" as const, headline: "Data engineer", skills: ["Python"] };

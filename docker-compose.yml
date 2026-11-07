@@ -1,0 +1,61 @@
+# Ingestion API (always) + an OPTIONAL local Supabase-compatible stack
+# (Postgres + pgvector, PostgREST, gateway) under the "local" profile.
+#
+#   With a real Supabase project:   docker compose up --build api
+#   Fully local (no Supabase):      docker compose --profile local up --build
+#
+# Variables come from .env (see .env.example).
+services:
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      PORT: "4000"
+      # Inside Docker, "localhost" is the container itself, so the API gets its own URL.
+      DATABASE_URL: ${COMPOSE_DATABASE_URL:-postgres://postgres:postgres@db:5432/postgres}
+    ports:
+      - "4000:4000"
+    restart: unless-stopped
+
+  db:
+    profiles: ["local"]
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "54322:5432"
+    volumes:
+      - tm-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      retries: 20
+
+  rest:
+    profiles: ["local"]
+    image: postgrest/postgrest:v12.2.3
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGRST_DB_URI: postgres://authenticator:authenticator-local-dev-only@db:5432/postgres
+      PGRST_DB_SCHEMAS: public
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_JWT_SECRET: ${LOCAL_JWT_SECRET:?set LOCAL_JWT_SECRET in .env (pnpm db:keys)}
+      PGRST_DB_EXTRA_SEARCH_PATH: public,extensions
+    restart: unless-stopped
+
+  gateway:
+    profiles: ["local"]
+    image: nginx:1.27-alpine
+    depends_on: [rest]
+    volumes:
+      - ./supabase/local/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "54321:8000"
+
+volumes:
+  tm-db:
