@@ -1,0 +1,30 @@
+{
+  "name": "@talentmatch/core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./embeddings": "./src/embeddings/index.ts",
+    "./explain": "./src/explain/index.ts",
+    "./ingest": "./src/ingest/index.ts",
+    "./db": "./src/db/index.ts",
+    "./seed": "./src/seed/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --exclude 'test/db/**'",
+    "test:db": "vitest run test/db"
+  },
+  "dependencies": {
+    "openai": "^7.53.0",
+    "pg": "^8.23.1",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "@types/pg": "^8.23.1",
+    "typescript": "5.9.3",
+    "vitest": "^3.2.7"
+  }
+}

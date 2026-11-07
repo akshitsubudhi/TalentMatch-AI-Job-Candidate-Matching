@@ -1,0 +1,34 @@
+{
+  "name": "talentmatch",
+  "private": true,
+  "version": "0.1.0",
+  "description": "AI job–candidate matching with hybrid (full-text + pgvector) search and RRF.",
+  "type": "module",
+  "packageManager": "pnpm@10.28.0",
+  "engines": {
+    "node": ">=20.11"
+  },
+  "scripts": {
+    "typecheck": "pnpm -r --parallel run typecheck && tsc -p scripts/tsconfig.json --noEmit",
+    "lint": "eslint . --max-warnings=0",
+    "test": "pnpm -r run test",
+    "test:db": "pnpm --filter @talentmatch/core run test:db",
+    "build": "pnpm -r run build",
+    "db:migrate": "tsx scripts/migrate.ts",
+    "db:keys": "tsx scripts/dev-keys.ts",
+    "seed": "tsx scripts/seed.ts",
+    "benchmark": "tsx scripts/benchmark.ts",
+    "dev:api": "pnpm --filter @talentmatch/api dev",
+    "dev:web": "pnpm --filter @talentmatch/web dev"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "@types/node": "^22.20.5",
+    "@types/pg": "^8.23.1",
+    "eslint": "^9.39.5",
+    "globals": "^17.14.0",
+    "tsx": "^4.23.15",
+    "typescript": "5.9.3",
+    "typescript-eslint": "^8.72.1"
+  }
+}
