@@ -1,0 +1,242 @@
+{
+  "env": {
+    "date": "2026-11-08T06:11:30.538Z",
+    "commit": "56d9098",
+    "node": "v22.23.4",
+    "cpu": "Intel(R) Xeon(R) Processor @ 2.10GHz",
+    "cores": 4,
+    "memoryGb": 16,
+    "platform": "Linux 6.18.44-fc-v310",
+    "postgres": "16.15 (Debian 16.15-1.pgdg12+2)",
+    "pgvector": "0.8.7"
+  },
+  "embeddingModel": "local-hash-v1",
+  "counts": {
+    "jobs": 200,
+    "candidates": 500,
+    "chunks": 862,
+    "models": [
+      "local-hash-v1"
+    ]
+  },
+  "labelled": {
+    "queries": 40,
+    "pairs": 238,
+    "recallCeiling": 1
+  },
+  "quality": [
+    {
+      "mode": "keyword-only",
+      "queries": 40,
+      "recallAt10": 0.43144841269841266,
+      "recallCi": [
+        0.3669002976190477,
+        0.4965156249999999
+      ],
+      "mrr": 0.663154761904762,
+      "mrrCi": [
+        0.5341994047619048,
+        0.7804218749999999
+      ]
+    },
+    {
+      "mode": "vector-only",
+      "queries": 40,
+      "recallAt10": 0.2775694444444444,
+      "recallCi": [
+        0.21977108134920634,
+        0.33074925595238097
+      ],
+      "mrr": 0.33370039682539676,
+      "mrrCi": [
+        0.23315203373015872,
+        0.4415230654761904
+      ]
+    },
+    {
+      "mode": "hybrid (RRF, w=1/1, k=60)",
+      "queries": 40,
+      "recallAt10": 0.38563492063492066,
+      "recallCi": [
+        0.3239439484126984,
+        0.4404776785714286
+      ],
+      "mrr": 0.5337003968253968,
+      "mrrCi": [
+        0.4179531249999999,
+        0.6472725694444441
+      ]
+    },
+    {
+      "mode": "hybrid w_kw=1 w_sem=2 k=60",
+      "queries": 40,
+      "recallAt10": 0.35140873015873014,
+      "recallCi": [
+        0.293951884920635,
+        0.4041793154761905
+      ],
+      "mrr": 0.4507440476190475,
+      "mrrCi": [
+        0.3388154761904762,
+        0.5627395833333334
+      ]
+    },
+    {
+      "mode": "hybrid w_kw=2 w_sem=1 k=60",
+      "queries": 40,
+      "recallAt10": 0.4188194444444444,
+      "recallCi": [
+        0.3517993551587301,
+        0.4830972222222222
+      ],
+      "mrr": 0.594375,
+      "mrrCi": [
+        0.47623958333333327,
+        0.7112499999999999
+      ]
+    },
+    {
+      "mode": "hybrid w_kw=1 w_sem=1 k=10",
+      "queries": 40,
+      "recallAt10": 0.39552579365079354,
+      "recallCi": [
+        0.3297688492063493,
+        0.4559680059523808
+      ],
+      "mrr": 0.542688492063492,
+      "mrrCi": [
+        0.4238430059523809,
+        0.6599159226190475
+      ]
+    }
+  ],
+  "latency": [
+    {
+      "scale": "500 candidates / 862 chunks",
+      "hnsw": "on",
+      "mode": "keyword-only",
+      "samples": 600,
+      "p50": 4.690463499999623,
+      "p95": 5.243743199999835,
+      "mean": 4.668159145000021
+    },
+    {
+      "scale": "500 candidates / 862 chunks",
+      "hnsw": "on",
+      "mode": "vector-only",
+      "samples": 600,
+      "p50": 4.659486000000015,
+      "p95": 5.260378200000467,
+      "mean": 4.774490198333325
+    },
+    {
+      "scale": "500 candidates / 862 chunks",
+      "hnsw": "on",
+      "mode": "hybrid (RRF, w=1/1, k=60)",
+      "samples": 600,
+      "p50": 7.969702500000494,
+      "p95": 8.901892600000062,
+      "mean": 8.103297635000015
+    },
+    {
+      "scale": "500 candidates / 862 chunks",
+      "hnsw": "off",
+      "mode": "keyword-only",
+      "samples": 600,
+      "p50": 4.635635999999067,
+      "p95": 5.09458715000128,
+      "mean": 4.627286746666678
+    },
+    {
+      "scale": "500 candidates / 862 chunks",
+      "hnsw": "off",
+      "mode": "vector-only",
+      "samples": 600,
+      "p50": 4.6716044999993755,
+      "p95": 6.841343499998583,
+      "mean": 4.96299931833332
+    },
+    {
+      "scale": "500 candidates / 862 chunks",
+      "hnsw": "off",
+      "mode": "hybrid (RRF, w=1/1, k=60)",
+      "samples": 600,
+      "p50": 7.938380000001416,
+      "p95": 11.124617750001015,
+      "mean": 8.199499326666592
+    }
+  ],
+  "planOn": "sequential scan + top-N sort (exact)",
+  "planOff": "sequential scan + top-N sort (exact)",
+  "scale": {
+    "database": "tm_bench_scale_1794118314689",
+    "counts": {
+      "jobs": 200,
+      "candidates": 20000,
+      "chunks": 34506,
+      "models": [
+        "local-hash-v1"
+      ]
+    },
+    "ingestSeconds": 68.463310837,
+    "planOn": "HNSW index scan",
+    "planOff": "sequential scan + top-N sort (exact)",
+    "annOverlap": 0.9995,
+    "latency": [
+      {
+        "scale": "20000 candidates / 34506 chunks",
+        "hnsw": "on",
+        "mode": "keyword-only",
+        "samples": 200,
+        "p50": 140.01715349999722,
+        "p95": 161.57966440000743,
+        "mean": 140.50086157999962
+      },
+      {
+        "scale": "20000 candidates / 34506 chunks",
+        "hnsw": "on",
+        "mode": "vector-only",
+        "samples": 200,
+        "p50": 11.417537999994238,
+        "p95": 15.227302250004863,
+        "mean": 11.255407880000494
+      },
+      {
+        "scale": "20000 candidates / 34506 chunks",
+        "hnsw": "on",
+        "mode": "hybrid (RRF, w=1/1, k=60)",
+        "samples": 200,
+        "p50": 152.74376450001728,
+        "p95": 172.3035041999828,
+        "mean": 152.26937627499908
+      },
+      {
+        "scale": "20000 candidates / 34506 chunks",
+        "hnsw": "off",
+        "mode": "keyword-only",
+        "samples": 200,
+        "p50": 139.88652950001415,
+        "p95": 156.890364199983,
+        "mean": 139.13231232000078
+      },
+      {
+        "scale": "20000 candidates / 34506 chunks",
+        "hnsw": "off",
+        "mode": "vector-only",
+        "samples": 200,
+        "p50": 105.81021100001817,
+        "p95": 113.54179850000072,
+        "mean": 106.9743014849996
+      },
+      {
+        "scale": "20000 candidates / 34506 chunks",
+        "hnsw": "off",
+        "mode": "hybrid (RRF, w=1/1, k=60)",
+        "samples": 200,
+        "p50": 259.9645155000035,
+        "p95": 281.2034272999895,
+        "mean": 259.84203805500033
+      }
+    ]
+  }
+}
