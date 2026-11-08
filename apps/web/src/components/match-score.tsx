@@ -28,7 +28,7 @@ export function MatchScore({
       <div className="h-1.5 w-32 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800" aria-hidden>
         <div className="h-full rounded-full bg-brand-500" style={{ width: `${pct}%` }} />
       </div>
-      <dl className="flex gap-3 text-xs text-slate-500 dark:text-slate-400">
+      <dl className="flex gap-3 whitespace-nowrap text-xs text-slate-500 dark:text-slate-400">
         <div>
           <dt className="sr-only">Keyword rank</dt>
           <dd>Keyword {keywordRank ? `#${keywordRank}` : "—"}</dd>
