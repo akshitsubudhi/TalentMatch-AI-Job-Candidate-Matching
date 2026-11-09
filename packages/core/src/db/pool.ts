@@ -14,7 +14,7 @@ export function createPool(env: PoolEnv): pg.Pool {
   if (!env.DATABASE_URL) throw new Error("DATABASE_URL is required");
   const url = new URL(env.DATABASE_URL);
   const isLocal = ["localhost", "127.0.0.1", "::1", "db", "postgres"].includes(url.hostname);
-  const mode = env.DATABASE_SSL ?? (isLocal ? "disable" : "verify");
+  const mode = env.DATABASE_SSL || (isLocal ? "disable" : "verify");
   // sslmode in the URL would override our explicit config; strip it.
   url.searchParams.delete("sslmode");
 
@@ -28,7 +28,7 @@ export function createPool(env: PoolEnv): pg.Pool {
   return new pg.Pool({
     connectionString: url.toString(),
     ssl,
-    max: Number(env.DATABASE_POOL_MAX ?? 10),
+    max: Number(env.DATABASE_POOL_MAX || 10),
     idleTimeoutMillis: 30_000,
     connectionTimeoutMillis: 10_000,
   });

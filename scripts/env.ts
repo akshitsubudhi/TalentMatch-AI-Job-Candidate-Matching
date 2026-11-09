@@ -8,6 +8,8 @@ export const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)
 export function loadDotEnv(): void {
   const file = path.join(repoRoot, ".env");
   if (existsSync(file)) process.loadEnvFile(file);
+  // `.env.example`-style empty values (FOO=) mean "unset".
+  for (const [key, value] of Object.entries(process.env)) if (value !== undefined && value.trim() === "") delete process.env[key];
 }
 
 export function flag(name: string): boolean {

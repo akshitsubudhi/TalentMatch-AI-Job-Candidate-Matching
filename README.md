@@ -100,7 +100,11 @@ What the numbers say, and don't say:
 
 - **HNSW matters at scale, not at demo scale.** At 34.5k chunks, vector-only p50 drops from 105.8 ms (exact scan) to 11.4 ms with HNSW. Top-10 overlap with exact search is 1.000. At 862 chunks the planner correctly ignores the index, so on and off are identical.
 - **Hybrid latency at scale is dominated by keyword ranking.** Keyword-only alone is 140 ms p50, because `ts_rank` has to score every resume that matches the OR-query. This is the next thing to optimise (for example, rank against a smaller skills/headline `tsvector`).
-- **With this non-semantic embedder, keyword-only beats hybrid on quality**, and hybrid beats vector-only. That's expected: the hashing embedder can't connect described skills to skill names, and the labels reward named skills. These numbers do **not** show that hybrid search helps. Re-run with OpenAI embeddings to test that.
+- **With this non-semantic embedder, keyword-only beats hybrid on quality**, and hybrid beats vector-only. That's expected: the hashing embedder can't connect described skills to skill names, and the labels reward named skills. These numbers do **not** show that hybrid search helps. Re-run with real embeddings to test that, for free with Ollama:
+
+  ```bash
+  EMBEDDINGS_PROVIDER=ollama pnpm seed --reset && EMBEDDINGS_PROVIDER=ollama pnpm benchmark --scale=20000
+  ```
 - **Two performance bugs were found by profiling at 20k resumes and fixed before these numbers** (commit `9150fc3`). PL/pgSQL generic plans were ignoring the HNSW index: a one-off profiling run measured vector-only p50 154 ms before vs 12.5 ms after `force_custom_plan`. And `ts_rank_cd` cost about 4× more than `ts_rank` on the keyword side.
 
 ## Setup
@@ -154,7 +158,14 @@ Keep `DATABASE_URL=postgres://postgres:postgres@localhost:54322/postgres` and `N
 ### 3. Embeddings and LLM provider
 
 - With OpenAI: set `OPENAI_API_KEY`, `EMBEDDINGS_PROVIDER=openai`, `EXPLANATIONS_PROVIDER=openai` (`OPENAI_CHAT_MODEL` defaults to `gpt-5-mini`).
-- Offline, free: `EMBEDDINGS_PROVIDER=local-hash` and `EXPLANATIONS_PROVIDER=rules`. The UI labels rule-based explanations as such.
+- Local and free with [Ollama](https://ollama.com): real semantic embeddings and LLM explanations on your own machine, no API key.
+
+  ```bash
+  ollama pull nomic-embed-text && ollama pull llama3.1:8b
+  ```
+
+  Then set `EMBEDDINGS_PROVIDER=ollama` and `EXPLANATIONS_PROVIDER=ollama`. `OLLAMA_BASE_URL` defaults to `http://localhost:11434/v1`, Ollama's OpenAI-compatible endpoint; the SDK sends a dummy API key that Ollama ignores. Embedding models narrower than 1536 dimensions (nomic-embed-text is 768) are zero-padded to fit `vector(1536)`, which leaves cosine similarity exactly unchanged. Ollama runs on your machine, so a Vercel deployment can't reach it.
+- Offline, free, no model at all: `EMBEDDINGS_PROVIDER=local-hash` and `EXPLANATIONS_PROVIDER=rules`. The UI labels rule-based explanations as such.
 
 Vectors from different models can't be compared. Each row stores `embedding_model`, and the seed refuses to mix models unless you pass `--reset`.
 
@@ -230,7 +241,7 @@ Error statuses: 400 (validation, with field-level `details`), 401, 413, 415, 422
 
 ## Limitations
 
-- **The benchmark numbers in this repo use a non-semantic embedder.** `local-hash-v1` hashes words and character trigrams, so "vector-only" measures lexical similarity. I couldn't run `text-embedding-3-small` during development (no API credits), and the OpenAI code paths are verified **only against mocked SDK clients**, not the live API. They follow the current SDK types (`embeddings.create`, `chat.completions.create` with `response_format: json_schema, strict: true`).
+- **The benchmark numbers in this repo use a non-semantic embedder.** `local-hash-v1` hashes words and character trigrams, so "vector-only" measures lexical similarity. I couldn't run `text-embedding-3-small` during development (no API credits), and the OpenAI and Ollama code paths are verified **only against mocked SDK clients and an Ollama-shaped fake HTTP server**, not a live model. They follow the current SDK types (`embeddings.create`, `chat.completions.create` with `response_format: json_schema, strict: true`).
 - **Synthetic data, synthetic labels.** The relevance labels come from the generator's ground-truth skills. They aren't human judgements, and they partly reward keyword overlap. Treat retrieval-quality numbers as a regression benchmark for this codebase, not evidence about real hiring data.
 - **No authentication.** Anyone who can reach the web app can browse all (synthetic) candidates and upload resumes. The service role is only used server-side, but there's no recruiter login, multi-tenancy or per-org RLS policy yet. Don't put real personal data in a public deployment.
 - **Explanations** are only generated for pairs that appear in a top-N list, as a cost guard. Resume text is sent to the LLM without the candidate's name, but it isn't otherwise redacted. There's a prompt-injection instruction, but no injection *detection*.

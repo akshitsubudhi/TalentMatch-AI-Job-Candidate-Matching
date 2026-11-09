@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { withoutEmptyStrings } from "@talentmatch/core";
 
 const EnvSchema = z
   .object({
@@ -8,7 +9,9 @@ const EnvSchema = z
     DATABASE_SSL: z.enum(["disable", "no-verify", "verify"]).optional(),
     DATABASE_CA_CERT: z.string().optional(),
     INGEST_API_KEY: z.string().min(16).optional(),
-    EMBEDDINGS_PROVIDER: z.enum(["openai", "local-hash"]).default("openai"),
+    EMBEDDINGS_PROVIDER: z.enum(["openai", "ollama", "local-hash"]).default("openai"),
+    OLLAMA_BASE_URL: z.string().url().optional(),
+    OLLAMA_EMBEDDING_MODEL: z.string().min(1).optional(),
     OPENAI_API_KEY: z.string().optional(),
     OPENAI_EMBEDDING_MODEL: z.string().default("text-embedding-3-small"),
     OPENAI_BASE_URL: z.string().url().optional(),
@@ -28,7 +31,7 @@ const EnvSchema = z
 export type ApiConfig = z.infer<typeof EnvSchema>;
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): ApiConfig {
-  const parsed = EnvSchema.safeParse(env);
+  const parsed = EnvSchema.safeParse(withoutEmptyStrings(env));
   if (!parsed.success) {
     const lines = parsed.error.issues.map((i) => `  - ${i.path.join(".")}: ${i.message}`);
     throw new Error(`Invalid environment:\n${lines.join("\n")}`);
