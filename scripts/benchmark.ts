@@ -22,7 +22,7 @@ import { performance } from "node:perf_hooks";
 import type pg from "pg";
 import { mean, percentile, reciprocalRank, recallAtK } from "@talentmatch/core";
 import { applyMigrations, createPool, PgIngestionRepository } from "@talentmatch/core/db";
-import { createEmbedder } from "@talentmatch/core/embeddings";
+import { BatchingEmbedder, createEmbedder } from "@talentmatch/core/embeddings";
 import { IngestionService, sha256Hex } from "@talentmatch/core/ingest";
 import { buildLabelledSet, createRng, generateDataset, type SeedDataset } from "@talentmatch/core/seed";
 import { loadDotEnv, option, repoRoot } from "./env";
@@ -215,7 +215,7 @@ async function scaleRun(basePool: pg.Pool, embedderModel: string) {
     });
     await pool.end();
     pool = createPool(env);
-    const embedder = createEmbedder(process.env);
+    const embedder = new BatchingEmbedder(createEmbedder(process.env));
     if (embedder.model !== embedderModel) throw new Error("embedder changed between runs");
     const service = new IngestionService({
       repository: new PgIngestionRepository(pool),
@@ -228,7 +228,7 @@ async function scaleRun(basePool: pg.Pool, embedderModel: string) {
     for (const j of dataset.jobs) await service.ingestJob(j.input, { isSynthetic: true });
     let next = 0;
     await Promise.all(
-      Array.from({ length: 8 }, async () => {
+      Array.from({ length: 48 }, async () => {
         while (next < dataset.candidates.length) {
           const c = dataset.candidates[next++]!;
           await service.ingestResume({

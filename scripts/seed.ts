@@ -4,12 +4,12 @@
  *
  *   pnpm seed                         # uses EMBEDDINGS_PROVIDER from .env
  *   pnpm seed --reset                 # delete existing synthetic rows first
- *   pnpm seed --jobs=200 --candidates=500 --seed=42 --concurrency=4
+ *   pnpm seed --jobs=200 --candidates=500 --seed=42 --concurrency=32
  *
  * Re-running is idempotent (content hashes), so an interrupted seed can resume.
  */
 import { createPool, PgIngestionRepository } from "@talentmatch/core/db";
-import { createEmbedder } from "@talentmatch/core/embeddings";
+import { BatchingEmbedder, createEmbedder } from "@talentmatch/core/embeddings";
 import { IngestionService } from "@talentmatch/core/ingest";
 import { generateDataset } from "@talentmatch/core/seed";
 import { flag, loadDotEnv, option } from "./env";
@@ -19,10 +19,11 @@ loadDotEnv();
 const jobsCount = Number(option("jobs") ?? 200);
 const candidatesCount = Number(option("candidates") ?? 500);
 const seed = Number(option("seed") ?? 42);
-const concurrency = Number(option("concurrency") ?? 4);
+const concurrency = Number(option("concurrency") ?? 32);
 
 const pool = createPool(process.env);
-const embedder = createEmbedder(process.env);
+// Concurrent resumes share provider requests (up to 96 inputs each).
+const embedder = new BatchingEmbedder(createEmbedder(process.env));
 const service = new IngestionService({
   repository: new PgIngestionRepository(pool),
   embedder,

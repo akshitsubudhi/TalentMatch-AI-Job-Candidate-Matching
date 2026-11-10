@@ -6,6 +6,7 @@ import type { Embedder } from "./types";
 export * from "./types";
 export { HashingEmbedder } from "./hashing";
 export { OpenAIEmbedder } from "./openai";
+export { BatchingEmbedder, type BatchingOptions } from "./batching";
 
 export type EmbeddingsProvider = "openai" | "ollama" | "local-hash";
 
