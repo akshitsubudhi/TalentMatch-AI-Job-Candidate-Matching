@@ -1,4 +1,6 @@
 import type OpenAI from "openai";
+import { estimateTokens } from "../text/chunk";
+import { TokenRateLimiter } from "./rate-limit";
 import { EMBEDDING_DIMENSIONS, EmbeddingError, type Embedder } from "./types";
 
 export interface OpenAIEmbedderOptions {
@@ -19,6 +21,11 @@ export interface OpenAIEmbedderOptions {
   zeroPad?: boolean;
   /** Label stored in embedding_model (defaults to `model`). */
   label?: string;
+  /**
+   * Client-side tokens-per-minute budget. Requests wait instead of tripping the
+   * provider's TPM limit during bulk ingestion. Unset = no client-side pacing.
+   */
+  tokensPerMinute?: number;
 }
 
 export class OpenAIEmbedder implements Embedder {
@@ -29,6 +36,7 @@ export class OpenAIEmbedder implements Embedder {
   private readonly apiModel: string;
   private readonly requestDimensions: boolean;
   private readonly zeroPad: boolean;
+  private readonly limiter: TokenRateLimiter | null;
 
   constructor(options: OpenAIEmbedderOptions) {
     this.client = options.client;
@@ -37,12 +45,15 @@ export class OpenAIEmbedder implements Embedder {
     this.batchSize = options.batchSize ?? 96;
     this.requestDimensions = options.requestDimensions ?? true;
     this.zeroPad = options.zeroPad ?? false;
+    this.limiter = options.tokensPerMinute ? new TokenRateLimiter(options.tokensPerMinute) : null;
   }
 
   async embed(texts: readonly string[]): Promise<number[][]> {
     const out: number[][] = [];
     for (let i = 0; i < texts.length; i += this.batchSize) {
       const batch = texts.slice(i, i + this.batchSize);
+      // ~4 chars/token estimate, +10% margin, plus per-input overhead.
+      if (this.limiter) await this.limiter.acquire(Math.ceil(batch.reduce((s, t) => s + estimateTokens(t) + 4, 0) * 1.1));
       let response;
       try {
         response = await this.client.embeddings.create({

@@ -17,6 +17,8 @@ export interface EmbedderEnv {
   OPENAI_API_KEY?: string | undefined;
   OPENAI_EMBEDDING_MODEL?: string | undefined;
   OPENAI_BASE_URL?: string | undefined;
+  /** Client-side tokens-per-minute budget for embeddings (default 800000; your OpenAI tier's TPM limit minus a margin). */
+  OPENAI_EMBEDDING_TPM?: string | undefined;
   OLLAMA_BASE_URL?: string | undefined;
   OLLAMA_EMBEDDING_MODEL?: string | undefined;
 }
@@ -38,7 +40,13 @@ export function createEmbedder(env: EmbedderEnv): Embedder {
         maxRetries: 8,
         timeout: 60_000,
       });
-      return new OpenAIEmbedder({ client, model: env.OPENAI_EMBEDDING_MODEL || "text-embedding-3-small" });
+      const tpm = Number(env.OPENAI_EMBEDDING_TPM || 800_000);
+      if (!Number.isFinite(tpm) || tpm <= 0) throw new Error("OPENAI_EMBEDDING_TPM must be a positive number");
+      return new OpenAIEmbedder({
+        client,
+        model: env.OPENAI_EMBEDDING_MODEL || "text-embedding-3-small",
+        tokensPerMinute: tpm,
+      });
     }
     case "ollama": {
       // Ollama's OpenAI-compatible endpoint: the SDK requires an API key, Ollama ignores it.

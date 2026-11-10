@@ -14,6 +14,7 @@ const EnvSchema = z
     OLLAMA_EMBEDDING_MODEL: z.string().min(1).optional(),
     OPENAI_API_KEY: z.string().optional(),
     OPENAI_EMBEDDING_MODEL: z.string().default("text-embedding-3-small"),
+    OPENAI_EMBEDDING_TPM: z.coerce.number().int().positive().optional(),
     OPENAI_BASE_URL: z.string().url().optional(),
     MAX_UPLOAD_BYTES: z.coerce.number().int().min(1024).max(20 * 1024 * 1024).default(5 * 1024 * 1024),
     RATE_LIMIT_PER_MINUTE: z.coerce.number().int().min(1).default(60),
