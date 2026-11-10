@@ -18,7 +18,7 @@ export interface EmbedderEnv {
   OPENAI_EMBEDDING_MODEL?: string | undefined;
   OPENAI_BASE_URL?: string | undefined;
   /** Client-side tokens-per-minute budget for embeddings (default 800000; your OpenAI tier's TPM limit minus a margin). */
-  OPENAI_EMBEDDING_TPM?: string | undefined;
+  OPENAI_EMBEDDING_TPM?: string | number | undefined;
   OLLAMA_BASE_URL?: string | undefined;
   OLLAMA_EMBEDDING_MODEL?: string | undefined;
 }
