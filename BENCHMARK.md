@@ -5,11 +5,11 @@
 
 ## Setup
 
-- Date: 2026-11-08T06:11:30.538Z · commit `56d9098`
+- Date: 2026-11-10T07:50:01.557Z · commit `2d11c54`
 - Data: **synthetic** seed (seed=42): 200 jobs, 500 resumes, 862 resume chunks
-- Embeddings: `local-hash-v1` — **the offline feature-hashing embedder, NOT an OpenAI model** (see caveats)
+- Embeddings: `text-embedding-3-small`
 - Postgres 16.15 (Debian 16.15-1.pgdg12+2) + pgvector 0.8.7, local Docker container; client on the same host
-- Machine: Intel(R) Xeon(R) Processor @ 2.10GHz, 4 vCPUs, 16 GB RAM, Linux 6.18.44-fc-v310, Node v22.23.4
+- Machine: Intel(R) Xeon(R) Processor @ 2.10GHz, 4 vCPUs, 16 GB RAM, Linux 6.18.44-fc-v338, Node v22.23.4
 
 ## Retrieval quality (job → candidates)
 
@@ -18,11 +18,18 @@ Labelled set: **40 jobs, 238 job→relevant-candidate pairs**, built by `buildLa
 | Mode | Recall@10 | 95% CI | MRR | 95% CI |
 |---|---:|---|---:|---|
 | keyword-only | 0.431 | [0.367, 0.497] | 0.663 | [0.534, 0.780] |
-| vector-only | 0.278 | [0.220, 0.331] | 0.334 | [0.233, 0.442] |
-| hybrid (RRF, w=1/1, k=60) | 0.386 | [0.324, 0.440] | 0.534 | [0.418, 0.647] |
-| hybrid w_kw=1 w_sem=2 k=60 | 0.351 | [0.294, 0.404] | 0.451 | [0.339, 0.563] |
-| hybrid w_kw=2 w_sem=1 k=60 | 0.419 | [0.352, 0.483] | 0.594 | [0.476, 0.711] |
-| hybrid w_kw=1 w_sem=1 k=10 | 0.396 | [0.330, 0.456] | 0.543 | [0.424, 0.660] |
+| vector-only | 0.445 | [0.393, 0.500] | 0.554 | [0.453, 0.666] |
+| hybrid (RRF, w=1/1, k=60) | 0.502 | [0.438, 0.567] | 0.701 | [0.594, 0.806] |
+| hybrid w_kw=1 w_sem=2 k=60 | 0.518 | [0.462, 0.578] | 0.677 | [0.572, 0.777] |
+| hybrid w_kw=2 w_sem=1 k=60 | 0.500 | [0.432, 0.564] | 0.706 | [0.599, 0.809] |
+| hybrid w_kw=1 w_sem=1 k=10 | 0.494 | [0.426, 0.560] | 0.701 | [0.589, 0.805] |
+
+Paired comparison (same queries; bootstrap over queries of the per-query difference). A CI that excludes 0 means the difference is unlikely to be resampling noise *on this labelled set*:
+
+| Comparison | ΔRecall@10 | 95% CI | queries better / worse | ΔMRR | 95% CI | queries better / worse |
+|---|---:|---|---|---:|---|---|
+| hybrid − keyword-only | +0.070 | [0.013, 0.129] | 16 / 6 | +0.038 | [-0.062, 0.133] | 15 / 6 |
+| hybrid − vector-only | +0.057 | [0.005, 0.110] | 15 / 7 | +0.147 | [0.037, 0.261] | 21 / 5 |
 
 Max achievable Recall@10 on this set is 1.000 (every labelled job has ≤10 relevant candidates). CIs are percentile bootstrap over queries (2,000 resamples). Rows below the first three are a small weight/k sweep of the same RPC; they were not used to choose the defaults.
 
@@ -32,35 +39,34 @@ Max achievable Recall@10 on this set is 1.000 (every labelled job has ≤10 rele
 
 | Data | HNSW index | Mode | Samples | p50 (ms) | p95 (ms) | Mean (ms) |
 |---|---|---|---:|---:|---:|---:|
-| 500 candidates / 862 chunks | on | keyword-only | 600 | 4.69 | 5.24 | 4.67 |
-| 500 candidates / 862 chunks | on | vector-only | 600 | 4.66 | 5.26 | 4.77 |
-| 500 candidates / 862 chunks | on | hybrid (RRF, w=1/1, k=60) | 600 | 7.97 | 8.90 | 8.10 |
-| 500 candidates / 862 chunks | off | keyword-only | 600 | 4.64 | 5.09 | 4.63 |
-| 500 candidates / 862 chunks | off | vector-only | 600 | 4.67 | 6.84 | 4.96 |
-| 500 candidates / 862 chunks | off | hybrid (RRF, w=1/1, k=60) | 600 | 7.94 | 11.12 | 8.20 |
+| 500 candidates / 862 chunks | on | keyword-only | 600 | 4.86 | 7.32 | 5.07 |
+| 500 candidates / 862 chunks | on | vector-only | 600 | 5.47 | 8.35 | 5.88 |
+| 500 candidates / 862 chunks | on | hybrid (RRF, w=1/1, k=60) | 600 | 9.67 | 13.90 | 10.12 |
+| 500 candidates / 862 chunks | off | keyword-only | 600 | 5.01 | 7.73 | 5.40 |
+| 500 candidates / 862 chunks | off | vector-only | 600 | 4.83 | 7.19 | 5.09 |
+| 500 candidates / 862 chunks | off | hybrid (RRF, w=1/1, k=60) | 600 | 9.79 | 14.25 | 10.22 |
 
 Planner's choice for the ANN step at this size: with the index → **sequential scan + top-N sort (exact)**; without → **sequential scan + top-N sort (exact)**.
 
 ### At larger scale (20000 synthetic resumes)
 
-A throwaway database with the same 200-job generator and 20000 generated resumes (34506 chunks; ingest took 68 s). 1 repetition(s) per job.
+A throwaway database with the same 200-job generator and 20000 generated resumes (34506 chunks; ingest took 801 s). 1 repetition(s) per job.
 
 | Data | HNSW index | Mode | Samples | p50 (ms) | p95 (ms) | Mean (ms) |
 |---|---|---|---:|---:|---:|---:|
-| 20000 candidates / 34506 chunks | on | keyword-only | 200 | 140.02 | 161.58 | 140.50 |
-| 20000 candidates / 34506 chunks | on | vector-only | 200 | 11.42 | 15.23 | 11.26 |
-| 20000 candidates / 34506 chunks | on | hybrid (RRF, w=1/1, k=60) | 200 | 152.74 | 172.30 | 152.27 |
-| 20000 candidates / 34506 chunks | off | keyword-only | 200 | 139.89 | 156.89 | 139.13 |
-| 20000 candidates / 34506 chunks | off | vector-only | 200 | 105.81 | 113.54 | 106.97 |
-| 20000 candidates / 34506 chunks | off | hybrid (RRF, w=1/1, k=60) | 200 | 259.96 | 281.20 | 259.84 |
+| 20000 candidates / 34506 chunks | on | keyword-only | 200 | 146.03 | 213.78 | 151.50 |
+| 20000 candidates / 34506 chunks | on | vector-only | 200 | 12.81 | 16.40 | 12.67 |
+| 20000 candidates / 34506 chunks | on | hybrid (RRF, w=1/1, k=60) | 200 | 166.66 | 236.03 | 173.26 |
+| 20000 candidates / 34506 chunks | off | keyword-only | 200 | 148.35 | 229.91 | 157.91 |
+| 20000 candidates / 34506 chunks | off | vector-only | 200 | 121.10 | 135.99 | 121.77 |
+| 20000 candidates / 34506 chunks | off | hybrid (RRF, w=1/1, k=60) | 200 | 282.84 | 362.40 | 289.32 |
 
 Planner's choice: with the index → **HNSW index scan**; without → **sequential scan + top-N sort (exact)**.
-HNSW accuracy: mean overlap between vector-only top-10 with the index and exact top-10 without it = **1.000** (ef_search=100, iterative scan relaxed_order).
+HNSW accuracy: mean overlap between vector-only top-10 with the index and exact top-10 without it = **0.994** (ef_search=100, iterative scan relaxed_order).
 
 ## Caveats (read before quoting any number)
 
-- **Embeddings are not semantic.** This run used `local-hash-v1`, a deterministic feature-hashing embedder (word + character-trigram hashing), because no OpenAI credits were available. "Vector-only" here measures sub-word lexical similarity, not meaning; it cannot connect a description like "orchestrated containerised workloads" to *Kubernetes*. Re-run with `EMBEDDINGS_PROVIDER=openai` (re-seed with `--reset`) to measure `text-embedding-3-small`.
 - **Synthetic data.** Resumes and jobs are template-generated, so absolute numbers say little about real recruiting data. Relevance labels come from the generator's skill tags, which the keyword retriever can partly see (named skills are also extracted into the indexed `skills` column); this favours keyword search.
-- **Small labelled set.** With ~40 queries the confidence intervals are wide; overlapping CIs mean the difference is not established.
+- **Small labelled set.** With ~40 queries the per-mode confidence intervals are wide and overlap; use the paired comparison to judge differences between modes.
 - **Latency** is a single-client, warm-cache, same-host measurement on a shared cloud VM; it excludes network and HTTP overhead and is not a throughput test.
 - At seed scale the planner may ignore the HNSW index entirely (exact scan is cheaper for under ~1k vectors), so "HNSW on/off" can be identical there; see the scale section for where the index matters.
