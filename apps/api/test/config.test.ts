@@ -16,9 +16,9 @@ describe("loadConfig", () => {
     expect(config.DATABASE_SSL).toBeUndefined();
   });
 
-  it("accepts the Ollama provider without an OpenAI key", () => {
-    const config = loadConfig({ DATABASE_URL: "postgres://u:p@localhost:5432/db", EMBEDDINGS_PROVIDER: "ollama" });
-    expect(config.EMBEDDINGS_PROVIDER).toBe("ollama");
+  it("accepts the offline provider without an OpenAI key", () => {
+    const config = loadConfig({ DATABASE_URL: "postgres://u:p@localhost:5432/db", EMBEDDINGS_PROVIDER: "local-hash" });
+    expect(config.EMBEDDINGS_PROVIDER).toBe("local-hash");
   });
 
   it("still requires an OpenAI key for the openai provider and an API key in production", () => {

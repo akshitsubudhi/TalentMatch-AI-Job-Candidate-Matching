@@ -8,9 +8,7 @@ export { HashingEmbedder } from "./hashing";
 export { OpenAIEmbedder } from "./openai";
 export { BatchingEmbedder, type BatchingOptions } from "./batching";
 
-export type EmbeddingsProvider = "openai" | "ollama" | "local-hash";
-
-export const DEFAULT_OLLAMA_BASE_URL = "http://localhost:11434/v1";
+export type EmbeddingsProvider = "openai" | "local-hash";
 
 export interface EmbedderEnv {
   EMBEDDINGS_PROVIDER?: string | undefined;
@@ -19,8 +17,6 @@ export interface EmbedderEnv {
   OPENAI_BASE_URL?: string | undefined;
   /** Client-side tokens-per-minute budget for embeddings (default 800000; your OpenAI tier's TPM limit minus a margin). */
   OPENAI_EMBEDDING_TPM?: string | number | undefined;
-  OLLAMA_BASE_URL?: string | undefined;
-  OLLAMA_EMBEDDING_MODEL?: string | undefined;
 }
 
 export function createEmbedder(env: EmbedderEnv): Embedder {
@@ -48,18 +44,7 @@ export function createEmbedder(env: EmbedderEnv): Embedder {
         tokensPerMinute: tpm,
       });
     }
-    case "ollama": {
-      // Ollama's OpenAI-compatible endpoint: the SDK requires an API key, Ollama ignores it.
-      const model = env.OLLAMA_EMBEDDING_MODEL || "nomic-embed-text";
-      const client = new OpenAI({
-        apiKey: "ollama",
-        baseURL: env.OLLAMA_BASE_URL || DEFAULT_OLLAMA_BASE_URL,
-        maxRetries: 2,
-        timeout: 120_000,
-      });
-      return new OpenAIEmbedder({ client, model, label: `ollama/${model}`, requestDimensions: false, zeroPad: true, batchSize: 32 });
-    }
     default:
-      throw new Error(`Unknown EMBEDDINGS_PROVIDER "${String(provider)}" (expected "openai", "ollama" or "local-hash")`);
+      throw new Error(`Unknown EMBEDDINGS_PROVIDER "${String(provider)}" (expected "openai" or "local-hash")`);
   }
 }

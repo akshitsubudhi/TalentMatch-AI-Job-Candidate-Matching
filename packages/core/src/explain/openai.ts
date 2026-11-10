@@ -12,10 +12,6 @@ export interface OpenAIExplainerOptions {
   validationRetries?: number;
   maxCompletionTokens?: number;
   reasoningEffort?: "minimal" | "low" | "medium" | "high";
-  /** OpenAI uses max_completion_tokens; OpenAI-compatible servers (Ollama) read max_tokens. */
-  tokenLimitParam?: "max_completion_tokens" | "max_tokens";
-  /** Label stored in match_explanations.model (defaults to `model`). */
-  label?: string;
 }
 
 export class OpenAIExplainer implements Explainer {
@@ -25,14 +21,10 @@ export class OpenAIExplainer implements Explainer {
   private readonly validationRetries: number;
   private readonly maxCompletionTokens: number;
   private readonly reasoningEffort: OpenAIExplainerOptions["reasoningEffort"];
-  private readonly apiModel: string;
-  private readonly tokenLimitParam: NonNullable<OpenAIExplainerOptions["tokenLimitParam"]>;
 
   constructor(options: OpenAIExplainerOptions) {
     this.client = options.client;
-    this.apiModel = options.model ?? "gpt-5-mini";
-    this.model = options.label ?? this.apiModel;
-    this.tokenLimitParam = options.tokenLimitParam ?? "max_completion_tokens";
+    this.model = options.model ?? "gpt-5-mini";
     this.validationRetries = options.validationRetries ?? 1;
     this.maxCompletionTokens = options.maxCompletionTokens ?? 2_000;
     this.reasoningEffort = options.reasoningEffort;
@@ -44,7 +36,7 @@ export class OpenAIExplainer implements Explainer {
       let content: string | null | undefined;
       try {
         const completion = await this.client.chat.completions.create({
-          model: this.apiModel,
+          model: this.model,
           messages: [
             { role: "system", content: SYSTEM_PROMPT },
             { role: "user", content: buildUserPrompt(input) },
@@ -53,7 +45,7 @@ export class OpenAIExplainer implements Explainer {
             type: "json_schema",
             json_schema: { name: "match_explanation", strict: true, schema: EXPLANATION_JSON_SCHEMA },
           },
-          [this.tokenLimitParam]: this.maxCompletionTokens,
+          max_completion_tokens: this.maxCompletionTokens,
           ...(this.reasoningEffort ? { reasoning_effort: this.reasoningEffort } : {}),
         });
         const choice = completion.choices[0];

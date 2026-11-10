@@ -2,7 +2,7 @@
 
 TalentMatch matches jobs and candidates in both directions. Recruiters post jobs and candidates upload resumes (PDF or text). A separate Express service parses, cleans, chunks and embeds each resume, idempotently. Matching runs as a single PostgreSQL function that combines **full-text search** (tsvector + GIN) with **pgvector cosine similarity** (HNSW) using **weighted Reciprocal Rank Fusion**. Location and seniority filters are applied in SQL *before* ranking. For the top matches an LLM writes a short "why this fits", plus matched and missing skills, as **zod-validated structured JSON**. The result is cached per `(job, candidate, prompt_version)`. Every number in this README comes from `scripts/benchmark.ts` ([BENCHMARK.md](BENCHMARK.md)), and the demo runs entirely on clearly labelled **synthetic** data.
 
-> **Status, plainly:** everything below is implemented and tested (142 automated tests, CI). The OpenAI paths were verified **live**: embeddings with `text-embedding-3-small`, and structured explanations with `gpt-5-mini` through the running app (validated JSON, cached on the second request). All benchmark numbers come from `text-embedding-3-small` on synthetic data. See [Limitations](#limitations).
+> **Status, plainly:** everything below is implemented and tested (138 automated tests, CI). The OpenAI paths were verified **live**: embeddings with `text-embedding-3-small`, and structured explanations with `gpt-5-mini` through the running app (validated JSON, cached on the second request). All benchmark numbers come from `text-embedding-3-small` on synthetic data. See [Limitations](#limitations).
 
 ## Architecture
 
@@ -163,14 +163,7 @@ Keep `DATABASE_URL=postgres://postgres:postgres@localhost:54322/postgres` and `N
 ### 3. Embeddings and LLM provider
 
 - With OpenAI: set `OPENAI_API_KEY`, `EMBEDDINGS_PROVIDER=openai`, `EXPLANATIONS_PROVIDER=openai` (`OPENAI_CHAT_MODEL` defaults to `gpt-5-mini`).
-- Local and free with [Ollama](https://ollama.com): real semantic embeddings and LLM explanations on your own machine, no API key.
-
-  ```bash
-  ollama pull nomic-embed-text && ollama pull llama3.1:8b
-  ```
-
-  Then set `EMBEDDINGS_PROVIDER=ollama` and `EXPLANATIONS_PROVIDER=ollama`. `OLLAMA_BASE_URL` defaults to `http://localhost:11434/v1`, Ollama's OpenAI-compatible endpoint; the SDK sends a dummy API key that Ollama ignores. Embedding models narrower than 1536 dimensions (nomic-embed-text is 768) are zero-padded to fit `vector(1536)`, which leaves cosine similarity exactly unchanged. Ollama runs on your machine, so a Vercel deployment can't reach it.
-- Offline, free, no model at all: `EMBEDDINGS_PROVIDER=local-hash` and `EXPLANATIONS_PROVIDER=rules`. The UI labels rule-based explanations as such.
+- Offline and free: `EMBEDDINGS_PROVIDER=local-hash` and `EXPLANATIONS_PROVIDER=rules`. The UI labels rule-based explanations as such.
 
 Vectors from different models can't be compared. Each row stores `embedding_model`, and the seed refuses to mix models unless you pass `--reset`.
 
@@ -246,7 +239,7 @@ Error statuses: 400 (validation, with field-level `details`), 401, 413, 415, 422
 
 ## Limitations
 
-- **What was verified live, and what wasn't.** OpenAI embeddings (`text-embedding-3-small`) and explanations (`gpt-5-mini`, JSON-schema output, zod validation, cache hit on repeat) were exercised against the live API, end to end through the app. The Ollama provider is verified only against an Ollama-shaped fake HTTP server, not a live Ollama. The offline `local-hash-v1` embedder is for tests and offline demos; it isn't semantic.
+- **What was verified live, and what wasn't.** OpenAI embeddings (`text-embedding-3-small`) and explanations (`gpt-5-mini`, JSON-schema output, zod validation, cache hit on repeat) were exercised against the live API, end to end through the app. The offline `local-hash-v1` embedder is for tests and offline demos; it isn't semantic.
 - **Synthetic data, synthetic labels.** The relevance labels come from the generator's ground-truth skills. They aren't human judgements, and they partly reward keyword overlap. Treat retrieval-quality numbers as a regression benchmark for this codebase, not evidence about real hiring data.
 - **No authentication.** Anyone who can reach the web app can browse all (synthetic) candidates and upload resumes. The service role is only used server-side, but there's no recruiter login, multi-tenancy or per-org RLS policy yet. Don't put real personal data in a public deployment.
 - **Explanations** are only generated for pairs that appear in a top-N list, as a cost guard. Resume text is sent to the LLM without the candidate's name, but it isn't otherwise redacted. There's a prompt-injection instruction, but no injection *detection*.

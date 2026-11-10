@@ -9,19 +9,6 @@ export interface OpenAIEmbedderOptions {
   /** Inputs per request. The API accepts up to 2048; smaller batches fail faster. */
   batchSize?: number;
   /**
-   * Send `dimensions` in the request (only OpenAI's text-embedding-3-* models support it).
-   * Set false for OpenAI-compatible servers such as Ollama.
-   */
-  requestDimensions?: boolean;
-  /**
-   * Zero-pad vectors shorter than 1536 (e.g. 768-d nomic-embed-text) so they fit the
-   * vector(1536) columns. Zero-padding leaves dot products and norms unchanged, so cosine
-   * similarity between two padded vectors equals cosine between the originals.
-   */
-  zeroPad?: boolean;
-  /** Label stored in embedding_model (defaults to `model`). */
-  label?: string;
-  /**
    * Client-side tokens-per-minute budget. Requests wait instead of tripping the
    * provider's TPM limit during bulk ingestion. Unset = no client-side pacing.
    */
@@ -33,18 +20,12 @@ export class OpenAIEmbedder implements Embedder {
   readonly dimensions = EMBEDDING_DIMENSIONS;
   private readonly client: Pick<OpenAI, "embeddings">;
   private readonly batchSize: number;
-  private readonly apiModel: string;
-  private readonly requestDimensions: boolean;
-  private readonly zeroPad: boolean;
   private readonly limiter: TokenRateLimiter | null;
 
   constructor(options: OpenAIEmbedderOptions) {
     this.client = options.client;
-    this.apiModel = options.model ?? "text-embedding-3-small";
-    this.model = options.label ?? this.apiModel;
+    this.model = options.model ?? "text-embedding-3-small";
     this.batchSize = options.batchSize ?? 96;
-    this.requestDimensions = options.requestDimensions ?? true;
-    this.zeroPad = options.zeroPad ?? false;
     this.limiter = options.tokensPerMinute ? new TokenRateLimiter(options.tokensPerMinute) : null;
   }
 
@@ -57,9 +38,9 @@ export class OpenAIEmbedder implements Embedder {
       let response;
       try {
         response = await this.client.embeddings.create({
-          model: this.apiModel,
+          model: this.model,
           input: batch as string[],
-          ...(this.requestDimensions ? { dimensions: this.dimensions } : {}),
+          dimensions: this.dimensions,
           encoding_format: "float",
         });
       } catch (cause) {
@@ -70,17 +51,10 @@ export class OpenAIEmbedder implements Embedder {
         throw new EmbeddingError(`expected ${batch.length} embeddings, got ${sorted.length}`);
       }
       for (const item of sorted) {
-        const length = item.embedding.length;
-        if (length === this.dimensions) {
-          out.push(item.embedding);
-        } else if (this.zeroPad && length > 0 && length < this.dimensions) {
-          out.push([...item.embedding, ...new Array<number>(this.dimensions - length).fill(0)]);
-        } else {
-          throw new EmbeddingError(
-            `expected ${this.dimensions} dimensions, got ${length}` +
-              (length > this.dimensions ? " (models wider than 1536 dims are not supported by the schema)" : ""),
-          );
+        if (item.embedding.length !== this.dimensions) {
+          throw new EmbeddingError(`expected ${this.dimensions} dimensions, got ${item.embedding.length}`);
         }
+        out.push(item.embedding);
       }
     }
     return out;
