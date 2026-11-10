@@ -123,6 +123,13 @@ async function withoutHnsw<T>(client: pg.PoolClient, fn: () => Promise<T>): Prom
   }
 }
 
+/** Paired bootstrap: resample queries, compare the two modes on the same queries. */
+function pairedDiff(a: number[], b: number[], seed = 7, iterations = 2000) {
+  const diffs = a.map((v, i) => v - (b[i] as number));
+  const [lo, hi] = bootstrapCi(diffs, seed, iterations);
+  return { meanDiff: mean(diffs), ci: [lo, hi] as [number, number], wins: diffs.filter((d) => d > 0).length, losses: diffs.filter((d) => d < 0).length };
+}
+
 function bootstrapCi(values: number[], seed = 1, iterations = 2000): [number, number] {
   const rng = createRng(seed);
   const means: number[] = [];
@@ -137,6 +144,8 @@ function bootstrapCi(values: number[], seed = 1, iterations = 2000): [number, nu
 interface QualityRow {
   mode: string;
   queries: number;
+  perQueryRecall: number[];
+  perQueryRr: number[];
   recallAt10: number;
   recallCi: [number, number];
   mrr: number;
@@ -324,6 +333,8 @@ async function main() {
         quality.push({
           mode: mode.name,
           queries: queries.length,
+          perQueryRecall: recalls,
+          perQueryRr: rrs,
           recallAt10: mean(recalls),
           recallCi: bootstrapCi(recalls),
           mrr: mean(rrs),
@@ -347,18 +358,26 @@ async function main() {
 
     const scaleResult = SCALE > 0 ? await scaleRun(pool, embeddingModel) : null;
 
-    const results = { env, embeddingModel, counts: c, labelled: { queries: queries.length, pairs, recallCeiling: ceiling }, quality, latency, planOn, planOff, scale: scaleResult };
+    const [kw, vec, hyb] = [quality[0]!, quality[1]!, quality[2]!];
+    const paired = [
+      { comparison: "hybrid − keyword-only", recall: pairedDiff(hyb.perQueryRecall, kw.perQueryRecall), mrr: pairedDiff(hyb.perQueryRr, kw.perQueryRr) },
+      { comparison: "hybrid − vector-only", recall: pairedDiff(hyb.perQueryRecall, vec.perQueryRecall), mrr: pairedDiff(hyb.perQueryRr, vec.perQueryRr) },
+    ];
+    const results = { env, embeddingModel, counts: c, labelled: { queries: queries.length, pairs, recallCeiling: ceiling }, quality, paired, latency, planOn, planOff, scale: scaleResult };
     writeFileSync(path.join(repoRoot, "benchmark-results.json"), `${JSON.stringify(results, null, 2)}\n`);
     writeFileSync(path.join(repoRoot, "BENCHMARK.md"), renderMarkdown(results));
     console.log("[bench] wrote BENCHMARK.md and benchmark-results.json");
     console.table(quality.map((q) => ({ mode: q.mode, "Recall@10": fmt(q.recallAt10, 3), MRR: fmt(q.mrr, 3) })));
+    console.table(paired.map((p) => ({ comparison: p.comparison, dRecall: fmt(p.recall.meanDiff, 3), recallCi: ci(p.recall.ci), dMrr: fmt(p.mrr.meanDiff, 3), mrrCi: ci(p.mrr.ci) })));
     console.table([...latency, ...(scaleResult?.latency ?? [])].map((l) => ({ scale: l.scale, hnsw: l.hnsw, mode: l.mode, p50: fmt(l.p50), p95: fmt(l.p95) })));
   } finally {
     await pool.end();
   }
 }
 
+type PairedRow = { comparison: string; recall: ReturnType<typeof pairedDiff>; mrr: ReturnType<typeof pairedDiff> };
 type Results = {
+  paired: PairedRow[];
   env: Awaited<ReturnType<typeof environmentInfo>>;
   embeddingModel: string;
   counts: Awaited<ReturnType<typeof counts>>;
@@ -401,6 +420,15 @@ function renderMarkdown(r: Results): string {
     "|---|---:|---|---:|---|",
     ...r.quality.map((q) => `| ${q.mode} | ${fmt(q.recallAt10, 3)} | ${ci(q.recallCi)} | ${fmt(q.mrr, 3)} | ${ci(q.mrrCi)} |`),
     "",
+    "Paired comparison (same queries; bootstrap over queries of the per-query difference). A CI that excludes 0 means the difference is unlikely to be resampling noise *on this labelled set*:",
+    "",
+    "| Comparison | ΔRecall@10 | 95% CI | queries better / worse | ΔMRR | 95% CI | queries better / worse |",
+    "|---|---:|---|---|---:|---|---|",
+    ...r.paired.map(
+      (p) =>
+        `| ${p.comparison} | ${p.recall.meanDiff >= 0 ? "+" : ""}${fmt(p.recall.meanDiff, 3)} | ${ci(p.recall.ci)} | ${p.recall.wins} / ${p.recall.losses} | ${p.mrr.meanDiff >= 0 ? "+" : ""}${fmt(p.mrr.meanDiff, 3)} | ${ci(p.mrr.ci)} | ${p.mrr.wins} / ${p.mrr.losses} |`,
+    ),
+    "",
     `Max achievable Recall@10 on this set is ${fmt(r.labelled.recallCeiling, 3)} (every labelled job has ≤10 relevant candidates). CIs are percentile bootstrap over queries (2,000 resamples). Rows below the first three are a small weight/k sweep of the same RPC; they were not used to choose the defaults.`,
     "",
     "## Latency of the hybrid search RPC",
@@ -436,7 +464,7 @@ function renderMarkdown(r: Results): string {
         ]
       : []),
     "- **Synthetic data.** Resumes and jobs are template-generated, so absolute numbers say little about real recruiting data. Relevance labels come from the generator's skill tags, which the keyword retriever can partly see (named skills are also extracted into the indexed `skills` column); this favours keyword search.",
-    "- **Small labelled set.** With ~40 queries the confidence intervals are wide; overlapping CIs mean the difference is not established.",
+    "- **Small labelled set.** With ~40 queries the per-mode confidence intervals are wide and overlap; use the paired comparison to judge differences between modes.",
     "- **Latency** is a single-client, warm-cache, same-host measurement on a shared cloud VM; it excludes network and HTTP overhead and is not a throughput test.",
     "- At seed scale the planner may ignore the HNSW index entirely (exact scan is cheaper for under ~1k vectors), so \"HNSW on/off\" can be identical there; see the scale section for where the index matters.",
     "",
