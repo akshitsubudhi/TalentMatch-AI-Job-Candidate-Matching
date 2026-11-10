@@ -33,8 +33,10 @@ export function createEmbedder(env: EmbedderEnv): Embedder {
       const client = new OpenAI({
         apiKey: env.OPENAI_API_KEY,
         ...(env.OPENAI_BASE_URL ? { baseURL: env.OPENAI_BASE_URL } : {}),
-        maxRetries: 3,
-        timeout: 30_000,
+        // Bulk ingestion can hit the tokens-per-minute limit; the SDK backs off exponentially
+        // and honours retry-after headers, so a generous retry budget rides out the window.
+        maxRetries: 8,
+        timeout: 60_000,
       });
       return new OpenAIEmbedder({ client, model: env.OPENAI_EMBEDDING_MODEL || "text-embedding-3-small" });
     }
